@@ -1,13 +1,15 @@
-# (note: all # comments are for explanation purely for learning purposes)
+# (note: all comments are for explanation purely for learning purposes)
 import json # Importing the json module to handle JSON file operations
 try:
-    with open("save.json", "r") as file:   # "r" means read mode, with means auto-closes the file when done
-        data = json.load(file)             # json.load reads JSON data from a file and converts it to a Python dictionary
-        total_coins = data.get("total_coins", 0)  # .get() retrieves the value for "total_coins", defaulting to 0 if not found
-        mood = data.get("mood", "content")  # .get() retrieves the value for "mood", defaulting to "content" if not found
-except (FileNotFoundError, json.JSONDecodeError): # If the file doesn't exist or is empty/corrupted
+    with open("save.json", "r") as file:             # "r" means read mode, with means auto-closes the file when done
+        data = json.load(file)                       # json.load reads JSON data from a file and converts it to a Python dictionary
+        total_coins = data.get("total_coins", 0)     # .get() retrieves the value for "total_coins", defaulting to 0 if not found
+        mood = data.get("mood", "content")   
+        history = data.get("history", [])        # .get() retrieves the value for "history", defaulting to an empty list if not found
+except (FileNotFoundError, json.JSONDecodeError):    # If the file doesn't exist or is empty/corrupted
     total_coins = 0
     mood = "content"
+    history = []
 
 from datetime import datetime, timedelta
 
@@ -52,8 +54,10 @@ while running:
             wake_dt = parse_time(wake_time)
             if wake_dt <= bed_dt:
                 wake_dt = wake_dt + timedelta(days=1)
+            bed_display = bed_dt.strftime("%I:%M %p").lstrip("0")  # Format for display
+            wake_display = wake_dt.strftime("%I:%M %p").lstrip("0")
 
-            print(f"You went to bed at {bed_time} and woke up at {wake_time}.")
+            print(f"You went to bed at {bed_display} and woke up at {wake_display}.")
             sleep_duration = wake_dt - bed_dt
             hours_slept = round(sleep_duration.total_seconds() / 3600, 1)
 
@@ -84,7 +88,10 @@ while running:
             print("Marin is very sleepy! (×_×;)")
             mood = "sleepy"
             coins_earned = 0
-
+        
+        today = datetime.now()
+        date_str = today.strftime("%Y-%m-%d")  # Format date as "YYYY-MM-DD"
+        weekday_str = today.strftime("%A")     # Get the weekday name (e.g., "Monday")
         total_coins += coins_earned # Update total coins
 
         print("\n--- Daily Summary ---")               # \n creates a new line
@@ -92,11 +99,41 @@ while running:
         print(f"Coins earned today: {coins_earned}")
         print(f"Total coins: {total_coins}")
 
+        log = {
+            "date": date_str,
+            "weekday": weekday_str,
+            "bed_time": bed_display,
+            "wake_time": wake_display,
+            "hours_slept": hours_slept,
+            "mood": mood,
+            "coins_earned": coins_earned
+        }
+
+        replaced = False # Flag to check if we replaced an existing entry
+
+        for i, old_log in enumerate(history):
+            if old_log["date"] == date_str:
+                history[i] = log              # Replace the old log with the new one
+                replaced = True
+                break                         # Exit the loop after replacing 
+
+        if not replaced:
+            history.append(log)              # Add new log if no replacement occurred
+
+        history = history[-30:]  # Keep only the last 30 entries
+
         with open("save.json", "w") as file:
-            json.dump({"total_coins": total_coins, "mood": mood}, file)  # Save progress after logging sleep
+            json.dump({"total_coins": total_coins, "mood": mood, "history": history}, file)  # Save progress after logging sleep
 
     elif choice == "2":
         print(f"\nStatus is {mood}. Total coins: {total_coins}")
+        print("\n--- Sleep History ---")
+        for log in reversed(history[-7:]):  # Show last 7 entries. for & in loops through each entry in history
+            print(
+                f"{log['weekday']} {log['date']}\n"
+                f"Bed: {log['bed_time']}, Wake: {log['wake_time']}, "
+                f"\nHours Slept: {log['hours_slept']}, Mood: {log['mood']}, Coins Earned: {log['coins_earned']}\n")
+
     elif choice == "3":
         print("Goodbye! See you next time. (＾▽＾)")
         running = False
